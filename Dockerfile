@@ -1,11 +1,11 @@
-FROM php:8.2-apache
+FROM php:8.3-apache
 
-# 1. Descargar el instalador de extensiones PHP (Soluciona el problema de libc-client-dev e IMAP)
+# 1. Download PHP extension installer (Fixes libc-client-dev and IMAP issues)
 ADD https://github.com/mlocati/docker-php-extension-installer/releases/latest/download/install-php-extensions /usr/local/bin/
 
-# 2. Instalar paquetes del SISTEMA (Herramientas generales)
-# NOTA: He quitado las librerías -dev (libpng, libxml, etc) porque el instalador de arriba las maneja solo.
-# Se mantiene 'nodejs' y 'npm' de los repositorios estables.
+# 2. Install SYSTEM packages (General tools)
+# NOTE: Removed -dev libraries (libpng, libxml, etc) because the installer above handles them.
+# Keeping 'nodejs' and 'npm' from stable repositories.
 RUN chmod +x /usr/local/bin/install-php-extensions && \
     apt-get update && apt-get install -y --no-install-recommends \
     apt-transport-https \
@@ -30,9 +30,9 @@ RUN chmod +x /usr/local/bin/install-php-extensions && \
     jq \
     && rm -rf /var/lib/apt/lists/*
 
-# 3. Instalar extensiones PHP y PECL (Usando el script mágico)
-# Esto reemplaza todos los bloques 'docker-php-ext-install' y 'pecl install'
-# El script se encarga de las dependencias faltantes (como libc-client)
+# 3. Install PHP and PECL extensions (Using the magic script)
+# This replaces all 'docker-php-ext-install' and 'pecl install' blocks
+# The script handles missing dependencies (like libc-client)
 RUN install-php-extensions \
     bcmath \
     gd \
@@ -48,30 +48,30 @@ RUN install-php-extensions \
     imagick \
     xdebug
 
-# 4. Habilitar módulos de Apache
+# 4. Enable Apache modules
 RUN a2enmod rewrite headers
 
-# 5. Crear directorios necesarios
+# 5. Create necessary directories
 RUN mkdir -p .amp/apache.d .cache/bower .composer .drush .npm
 
-# 6. Copiar configuraciones
+# 6. Copy configurations
 COPY php.ini /usr/local/etc/php/conf.d/php.ini
 COPY 000-default.conf /etc/apache2/conf-enabled/
 
-# 7. Instalar Composer (Desde imagen oficial)
+# 7. Install Composer (From official image)
 COPY --from=composer:latest /usr/bin/composer /usr/local/bin/composer
 RUN composer global require drush/drush:8.* phpunit/phpunit
 
 ENV PATH="/root/.composer/vendor/bin:${PATH}"
 RUN ln -s /root/.composer/vendor/bin/phpunit /usr/bin/phpunit
 
-# 8. Alias de bash
+# 8. Bash aliases
 RUN echo 'export PATH="$HOME/.composer/vendor/drush/drush:$PATH"' >> /root/.bashrc \
   && echo "alias ll='ls -alF --color=auto'" >> /root/.bashrc \
   && echo "alias la='ls -A'" >> /root/.bashrc \
   && echo "alias l='ls -CF'" >> /root/.bashrc
 
-# 9. Buildkit y herramientas CiviCRM
+# 9. Buildkit and CiviCRM tools
 WORKDIR /buildkit
 ENV PATH="/buildkit/bin:${PATH}"
 
@@ -79,7 +79,7 @@ RUN git clone https://github.com/rubofvil/civicrm-buildkit.git . \
   && git clone https://github.com/squizlabs/PHP_CodeSniffer \
   && git clone https://github.com/civicrm/coder.git
 
-# Instalar PHP CodeSniffer
+# Install PHP CodeSniffer
 WORKDIR /tmp
 RUN curl -OL https://squizlabs.github.io/PHP_CodeSniffer/phpcs.phar \
   && cp phpcs.phar /usr/local/bin/phpcs \
@@ -88,13 +88,11 @@ RUN curl -OL https://squizlabs.github.io/PHP_CodeSniffer/phpcs.phar \
 WORKDIR /buildkit
 RUN phpcs --config-set installed_paths /buildkit/coder/coder_sniffer
 
-# Herramientas CiviCRM
+# CiviCRM Tools
 RUN curl -LsS https://download.civicrm.org/cv/cv.phar -o /usr/local/bin/cv \
   && curl -LsS https://download.civicrm.org/civix/civix.phar -o /usr/local/bin/civix \
   && curl https://drupalconsole.com/installer -L -o /usr/local/bin/drupal \
   && chmod +x /usr/local/bin/cv /usr/local/bin/civix /usr/local/bin/drupal
 
-# Eliminar xdebug para producción (Opcional)
+# Remove xdebug for production (Optional)
 RUN rm -f /usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini
-
-#
