@@ -153,7 +153,6 @@ download_drupal_civicrm:
 	docker-compose down && docker-compose up -d
 #	docker exec $(shell docker ps --filter name='^/$(PROJECT_NAME)_civicrm' --format "{{ .ID }}") composer install --working-dir=$(COMPOSER_ROOT)
 
-# ToDO get the credenctials with `drush @alias sql-connect`
 .PHONE: sync_external_db
 sync_external_db:
 #Pending to set a bigger insert in the external SET GLOBAL bulk_insert_buffer_size = 1024 * 1024 * 256;
@@ -172,6 +171,23 @@ sync_external_db:
 	sudo rsync -uzva --no-l -e "ssh $(SSH_REMOTE_EXTRA_PARAMS)" $(SSH_REMOTE_USER)@$(SSH_REMOTE_HOST):$(SSH_REMOTE_PATH)/vendor html/web/sites/default
 	make set_permissions
 
+get_external_db:
+	@RESPONSE_PARAMS_MYSQL=$$(ssh $(SSH_REMOTE_EXTRA_PARAMS) $(SSH_REMOTE_USER)@$(SSH_REMOTE_HOST) $(DRUSH_BASH_EXECUTION) sql-connect); \
+	echo "Original Connection String: $$RESPONSE_PARAMS_MYSQL"; \
+	MYSQL_REMOTE_USER=$$(echo "$$RESPONSE_PARAMS_MYSQL" | grep -Po '(?<=--user=)[^ ]+' || true); \
+	MYSQL_REMOTE_PASS=$$(echo "$$RESPONSE_PARAMS_MYSQL" | grep -Po '(?<=--password=)[^ ]+' || true); \
+	MYSQL_REMOTE_DB=$$(echo "$$RESPONSE_PARAMS_MYSQL" | grep -Po '(?<=--database=)[^ ]+' || true); \
+	MYSQL_REMOTE_HOST=$$(echo "$$RESPONSE_PARAMS_MYSQL" | grep -Po '(?<=--host=)[^ ]+' || true); \
+	MYSQL_REMOTE_PORT=$$(echo "$$RESPONSE_PARAMS_MYSQL" | grep -Po '(?<=--port=)[^ ]+' || true); \
+	echo "User:     $$MYSQL_REMOTE_USER"; \
+	echo "Password: $$MYSQL_REMOTE_PASS"; \
+	echo "Database: $$MYSQL_REMOTE_DB"; \
+	echo "Host:     $$MYSQL_REMOTE_HOST"; \
+	echo "Port:     $$MYSQL_REMOTE_PORT"
+	
+	
+	
+
 .PHONY connect_vpn:
 connect_vpn:
 	docker exec $(shell docker ps --filter name='^/$(PROJECT_NAME)_civicrm' --format "{{ .ID }}") vpnc-connect --local-port 0 $(VPN_CONFIG_FILE)
@@ -182,6 +198,23 @@ connect_vpn:
 .PHONY disconnect_vpn:
 disconnect_vpn:
 	docker exec $(shell docker ps --filter name='^/$(PROJECT_NAME)_civicrm' --format "{{ .ID }}") vpnc-disconnect
+
+.PHONY: import_site
+import_site:
+	@echo "=== Starting Import Site Workflow ==="
+	@echo "Step 1/4: Stopping existing containers..."
+	@docker-compose down
+	@echo "Step 2/4: Starting fresh containers..."
+	@docker-compose pull
+	@docker-compose up -d --remove-orphans
+	@echo "Waiting for containers to be ready..."
+	@sleep 10
+	@echo "Step 3/4: Syncing database and files from remote..."
+	$(MAKE) sync_external_db
+	@echo "Step 4/4: Setting permissions..."
+	$(MAKE) set_permissions
+	@echo "=== Import Site Workflow Complete ==="
+	@echo "Run 'make drush_uli' to get a one-time login link."
 
 .PHONY: logs
 logs:
