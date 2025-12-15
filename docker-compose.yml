@@ -14,9 +14,9 @@ services:
       - mysql
     restart: unless-stopped
     volumes:
-    - ./html:/var/www/html
-    - ./vpnc:/etc/vpnc
-    - ./scripts:/home/scripts
+      - ./html:/var/www/html
+      - ./vpnc:/etc/vpnc
+      - ./scripts:/home/scripts
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.${PROJECT_NAME}.entrypoints=http"

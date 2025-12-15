@@ -184,9 +184,44 @@ get_external_db:
 	echo "Database: $$MYSQL_REMOTE_DB"; \
 	echo "Host:     $$MYSQL_REMOTE_HOST"; \
 	echo "Port:     $$MYSQL_REMOTE_PORT"
+
+# Get the remote files from the remote server with scp, check if not exist the directory html and create
+get_remote_files:
+	@echo "Getting remote files from $(SSH_REMOTE_USER)@$(SSH_REMOTE_HOST):$(SSH_REMOTE_PATH) to html"
+	@mkdir -p html
+	rsync -avz -e "ssh $(SSH_REMOTE_EXTRA_PARAMS)" $(SSH_REMOTE_USER)@$(SSH_REMOTE_HOST):$(SSH_REMOTE_PATH) html
 	
-	
-	
+# Replace the configuration in the database from the settings.php with regex
+# Fixed path to the settings.php file, html/web/sites/default/settings.php
+# $databases['default']['default'] = array (
+#   'database' => 'xxxx',
+#   'username' => 'xxxx',
+#   'password' => 'xxxx',
+replace_settings:
+# Replace database
+	@echo "Validating replacement for database..."
+	@CID=$(shell docker ps --filter name='^/$(PROJECT_NAME)_civicrm' --format "{{ .ID }}"); \
+	if [ -z "$$CID" ]; then echo "Container not found"; exit 1; fi; \
+	CURRENT=$$(docker exec $$CID grep "'database'\s*=>" "$(SETTINGS_FILE)" || echo "[Not Found]"); \
+	PROPOSED=$$(docker exec $$CID sed "s|\('database'\s*=>\s*'\)[^']*\('\)|\1$(MYSQL_REMOTE_DB)\2|g" "$(SETTINGS_FILE)" | grep "'database'\s*=>" || echo "[Not Found]"); \
+	echo "Current:  $$CURRENT"; \
+	echo "Proposed: $$PROPOSED"; \
+	if [ "$$CURRENT" = "$$PROPOSED" ]; then \
+		echo "No changes needed or regex did not match."; \
+	else \
+		read -p "Is the proposed change correct? [y/N] " CONFIRM; \
+		if [ "$$CONFIRM" = "y" ] || [ "$$CONFIRM" = "Y" ]; then \
+			docker exec $$CID sed -i "s|\('database'\s*=>\s*'\)[^']*\('\)|\1$(MYSQL_REMOTE_DB)\2|g" "$(SETTINGS_FILE)"; \
+			echo "Replacement applied."; \
+		else \
+			echo "Replacement aborted by user."; \
+			exit 1; \
+		fi; \
+	fi
+# Replace user
+#docker exec $(shell docker ps --filter name='^/$(PROJECT_NAME)_civicrm' --format "{{ .ID }}") sed -i "s|\('username'\s*=>\s*'\)[^']*\('\)|\1$MYSQL_REMOTE_USER\2|g" "$SETTINGS_FILE"
+# Replace password
+#docker exec $(shell docker ps --filter name='^/$(PROJECT_NAME)_civicrm' --format "{{ .ID }}") sed -i "s|\('password'\s*=>\s*'\)[^']*\('\)|\1$MYSQL_REMOTE_PASS\2|g" "$SETTINGS_FILE"
 
 .PHONY connect_vpn:
 connect_vpn:
