@@ -171,7 +171,7 @@ sync_external_db:
 	sudo rsync -uzva --no-l -e "ssh $(SSH_REMOTE_EXTRA_PARAMS)" $(SSH_REMOTE_USER)@$(SSH_REMOTE_HOST):$(SSH_REMOTE_PATH)/vendor html/web/sites/default
 	make set_permissions
 
-get_external_db:
+replace_local_db_with_external_db:
 	@RESPONSE_PARAMS_MYSQL=$$(ssh $(SSH_REMOTE_EXTRA_PARAMS) $(SSH_REMOTE_USER)@$(SSH_REMOTE_HOST) $(DRUSH_BASH_EXECUTION) sql-connect); \
 	echo "Original Connection String: $$RESPONSE_PARAMS_MYSQL"; \
 	MYSQL_REMOTE_USER=$$(echo "$$RESPONSE_PARAMS_MYSQL" | grep -Po '(?<=--user=)[^ ]+' || true); \
@@ -183,7 +183,14 @@ get_external_db:
 	echo "Password: $$MYSQL_REMOTE_PASS"; \
 	echo "Database: $$MYSQL_REMOTE_DB"; \
 	echo "Host:     $$MYSQL_REMOTE_HOST"; \
-	echo "Port:     $$MYSQL_REMOTE_PORT"
+	echo "Port:     $$MYSQL_REMOTE_PORT"; \
+	ssh $(SSH_REMOTE_EXTRA_PARAMS) $(SSH_REMOTE_USER)@$(SSH_REMOTE_HOST) "mysqldump --skip-triggers -u $$MYSQL_REMOTE_USER -p$$MYSQL_REMOTE_PASS -h $$MYSQL_REMOTE_HOST $$MYSQL_REMOTE_DB" | gzip > $$MYSQL_REMOTE_DB.sql.gz; \
+	gunzip -f $$MYSQL_REMOTE_DB.sql.gz; \
+	docker cp $$MYSQL_REMOTE_DB.sql $(shell docker ps --filter name='^/$(PROJECT_NAME)_mysql' --format "{{ .ID }}"):/$$MYSQL_REMOTE_DB.sql; \
+	docker exec $(shell docker ps --filter name='^/$(PROJECT_NAME)_mysql' --format "{{ .ID }}") mysql -u root -padmin -e "DROP DATABASE IF EXISTS drupal; CREATE DATABASE drupal;"; \
+	docker exec $(shell docker ps --filter name='^/$(PROJECT_NAME)_mysql' --format "{{ .ID }}") sh -c "mysql -u root -padmin drupal < /$$MYSQL_REMOTE_DB.sql"; \
+	docker exec $(shell docker ps --filter name='^/$(PROJECT_NAME)_mysql' --format "{{ .ID }}") rm /$$MYSQL_REMOTE_DB.sql; \
+	rm $$MYSQL_REMOTE_DB.sql
 
 # Get the remote files from the remote server with scp, check if not exist the directory html and create
 get_remote_files:
