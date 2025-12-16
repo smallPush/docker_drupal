@@ -33,8 +33,8 @@ services:
     command: --init-file /home/init.sql
     volumes:
       - ./my.cnf:/etc/my.cnf:ro
-      - ${MYSQL_VOLUME}:/var/lib/mysql
       - ./init.sql:/home/init.sql
+      - ./mysql:/var/lib/mysql
     restart: unless-stopped
     networks:
       - smallpush_lan

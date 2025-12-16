@@ -198,30 +198,45 @@ get_remote_files:
 #   'username' => 'xxxx',
 #   'password' => 'xxxx',
 replace_settings:
-# Replace database
-	@echo "Validating replacement for database..."
+# Replace database configuration
+	@echo "Validating replacement for database settings..."
 	@CID=$(shell docker ps --filter name='^/$(PROJECT_NAME)_civicrm' --format "{{ .ID }}"); \
 	if [ -z "$$CID" ]; then echo "Container not found"; exit 1; fi; \
-	CURRENT=$$(docker exec $$CID grep "'database'\s*=>" "$(SETTINGS_FILE)" || echo "[Not Found]"); \
-	PROPOSED=$$(docker exec $$CID sed "s|\('database'\s*=>\s*'\)[^']*\('\)|\1$(MYSQL_REMOTE_DB)\2|g" "$(SETTINGS_FILE)" | grep "'database'\s*=>" || echo "[Not Found]"); \
-	echo "Current:  $$CURRENT"; \
-	echo "Proposed: $$PROPOSED"; \
-	if [ "$$CURRENT" = "$$PROPOSED" ]; then \
-		echo "No changes needed or regex did not match."; \
+	\
+	CURRENT_DB=$$(docker exec $$CID grep "'database'\s*=>" "$(SETTINGS_FILE)" | grep -v "^\s*\*" || echo "[DB Not Found]"); \
+	PROPOSED_DB=$$(docker exec $$CID sed "/^\s*\*/! s|\('database'\s*=>\s*'\)[^']*\('\)|\1$(MYSQL_LOCAL_DB)\2|g" "$(SETTINGS_FILE)" | grep "'database'\s*=>" | grep -v "^\s*\*" || echo "[DB Not Found]"); \
+	\
+	CURRENT_USER=$$(docker exec $$CID grep "'username'\s*=>" "$(SETTINGS_FILE)" | grep -v "^\s*\*" || echo "[User Not Found]"); \
+	PROPOSED_USER=$$(docker exec $$CID sed "/^\s*\*/! s|\('username'\s*=>\s*'\)[^']*\('\)|\1$(MYSQL_LOCAL_USER)\2|g" "$(SETTINGS_FILE)" | grep "'username'\s*=>" | grep -v "^\s*\*" || echo "[User Not Found]"); \
+	\
+	CURRENT_PASS=$$(docker exec $$CID grep "'password'\s*=>" "$(SETTINGS_FILE)" | grep -v "^\s*\*" || echo "[Pass Not Found]"); \
+	PROPOSED_PASS=$$(docker exec $$CID sed "/^\s*\*/! s|\('password'\s*=>\s*'\)[^']*\('\)|\1$(MYSQL_LOCAL_PASS)\2|g" "$(SETTINGS_FILE)" | grep "'password'\s*=>" | grep -v "^\s*\*" || echo "[Pass Not Found]"); \
+	\
+	CURRENT_HOST=$$(docker exec $$CID grep "'host'\s*=>" "$(SETTINGS_FILE)" | grep -v "^\s*\*" || echo "[Host Not Found]"); \
+	PROPOSED_HOST=$$(docker exec $$CID sed "/^\s*\*/! s|\('host'\s*=>\s*'\)[^']*\('\)|\1$(MYSQL_LOCAL_HOST)\2|g" "$(SETTINGS_FILE)" | grep "'host'\s*=>" | grep -v "^\s*\*" || echo "[Host Not Found]"); \
+	\
+	echo "---------------------------------------------------"; \
+	echo "Current Database: $$CURRENT_DB"; \
+	echo "Proposed Database: $$PROPOSED_DB"; \
+	echo "Current User:     $$CURRENT_USER"; \
+	echo "Proposed User:    $$PROPOSED_USER"; \
+	echo "Current Password: $$CURRENT_PASS"; \
+	echo "Proposed Password: $$PROPOSED_PASS"; \
+	echo "Current Host:     $$CURRENT_HOST"; \
+	echo "Proposed Host:    $$PROPOSED_HOST"; \
+	echo "---------------------------------------------------"; \
+	\
+	read -p "Are these proposed changes correct? [y/N] " CONFIRM; \
+	if [ "$$CONFIRM" = "y" ] || [ "$$CONFIRM" = "Y" ]; then \
+		docker exec $$CID sed -i "/^\s*\*/! s|\('database'\s*=>\s*'\)[^']*\('\)|\1$(MYSQL_LOCAL_DB)\2|g" "$(SETTINGS_FILE)"; \
+		docker exec $$CID sed -i "/^\s*\*/! s|\('username'\s*=>\s*'\)[^']*\('\)|\1$(MYSQL_LOCAL_USER)\2|g" "$(SETTINGS_FILE)"; \
+		docker exec $$CID sed -i "/^\s*\*/! s|\('password'\s*=>\s*'\)[^']*\('\)|\1$(MYSQL_LOCAL_PASS)\2|g" "$(SETTINGS_FILE)"; \
+		docker exec $$CID sed -i "/^\s*\*/! s|\('host'\s*=>\s*'\)[^']*\('\)|\1$(MYSQL_LOCAL_HOST)\2|g" "$(SETTINGS_FILE)"; \
+		echo "All replacements applied."; \
 	else \
-		read -p "Is the proposed change correct? [y/N] " CONFIRM; \
-		if [ "$$CONFIRM" = "y" ] || [ "$$CONFIRM" = "Y" ]; then \
-			docker exec $$CID sed -i "s|\('database'\s*=>\s*'\)[^']*\('\)|\1$(MYSQL_REMOTE_DB)\2|g" "$(SETTINGS_FILE)"; \
-			echo "Replacement applied."; \
-		else \
-			echo "Replacement aborted by user."; \
-			exit 1; \
-		fi; \
+		echo "Replacement aborted by user."; \
+		exit 1; \
 	fi
-# Replace user
-#docker exec $(shell docker ps --filter name='^/$(PROJECT_NAME)_civicrm' --format "{{ .ID }}") sed -i "s|\('username'\s*=>\s*'\)[^']*\('\)|\1$MYSQL_REMOTE_USER\2|g" "$SETTINGS_FILE"
-# Replace password
-#docker exec $(shell docker ps --filter name='^/$(PROJECT_NAME)_civicrm' --format "{{ .ID }}") sed -i "s|\('password'\s*=>\s*'\)[^']*\('\)|\1$MYSQL_REMOTE_PASS\2|g" "$SETTINGS_FILE"
 
 .PHONY connect_vpn:
 connect_vpn:
