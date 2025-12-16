@@ -3,7 +3,7 @@
 ## Requirements
 
 - Configure a traefik/create lan
-  - [traefik](https://github.com/rubofvil/docker_compose_traefik)
+  - [traefik](https://github.com/smallPush/docker_traefik)
 - Create a .env file
   - `cp .env.example .env`
 

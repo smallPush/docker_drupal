@@ -1,7 +1,7 @@
 version: "3.1"
 services:
   civicrm:
-    image: "rubofvil/civicrm_${PROJECT_NAME}"
+    image: "smallpush/civicrm_${PROJECT_NAME}"
     container_name: "${PROJECT_NAME}_civicrm"
     hostname: "${PROJECT_NAME}_civicrm"
     build: .
@@ -24,7 +24,7 @@ services:
       - "traefik.http.routers.${PROJECT_NAME}.service=${PROJECT_NAME}"
       - "traefik.http.services.${PROJECT_NAME}.loadbalancer.server.port=80"
     networks:
-      - rubofvil_lan
+      - smallpush_lan
   mysql:
     image: mariadb:10.11.6
     container_name: "${PROJECT_NAME}_mysql"
@@ -37,7 +37,7 @@ services:
       - ./init.sql:/home/init.sql
     restart: unless-stopped
     networks:
-      - rubofvil_lan
+      - smallpush_lan
   phpmyadmin:
     image: phpmyadmin/phpmyadmin
     container_name: "${PROJECT_NAME}_phpmyadmin"
@@ -55,7 +55,7 @@ services:
       - "traefik.http.routers.phpmyadmin${PROJECT_NAME}.service=phpmyadmin${PROJECT_NAME}"
       - "traefik.http.services.phpmyadmin${PROJECT_NAME}.loadbalancer.server.port=80"
     networks:
-      - rubofvil_lan
+      - smallpush_lan
   maildev:
     image: djfarrelly/maildev
     container_name: "${PROJECT_NAME}_maildev"
@@ -67,7 +67,7 @@ services:
       - "traefik.http.routers.maildev${PROJECT_NAME}.service=maildev${PROJECT_NAME}"
       - "traefik.http.services.maildev${PROJECT_NAME}.loadbalancer.server.port=80"
     networks:
-      - rubofvil_lan
+      - smallpush_lan
   chrome:
     image: selenium/standalone-chrome:97.0-chromedriver-97.0
     container_name: "${PROJECT_NAME}_selenium"
@@ -79,7 +79,7 @@ services:
     privileged: true
     shm_size: 2g
     networks:
-      - rubofvil_lan
+      - smallpush_lan
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.selenium${PROJECT_NAME}.entrypoints=http"
@@ -88,6 +88,6 @@ services:
       - "traefik.http.services.selenium${PROJECT_NAME}.loadbalancer.server.port=7900"
 
 networks:
-  rubofvil_lan:
+  smallpush_lan:
     external:
       name: ${NETWORK_NAME}

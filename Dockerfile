@@ -7,46 +7,46 @@ ADD https://github.com/mlocati/docker-php-extension-installer/releases/latest/do
 # NOTE: Removed -dev libraries (libpng, libxml, etc) because the installer above handles them.
 # Keeping 'nodejs' and 'npm' from stable repositories.
 RUN chmod +x /usr/local/bin/install-php-extensions && \
-    apt-get update && apt-get install -y --no-install-recommends \
-    apt-transport-https \
-    bash-completion \
-    default-mysql-client \
-    git \
-    iproute2 \
-    msmtp-mta \
-    nano \
-    nodejs \
-    npm \
-    rsync \
-    sudo \
-    unzip \
-    vim \
-    zip \
-    vpnc \
-    wget \
-    memcached \
-    telnet \
-    openssh-client \
-    jq \
-    && rm -rf /var/lib/apt/lists/*
+  apt-get update && apt-get install -y --no-install-recommends \
+  apt-transport-https \
+  bash-completion \
+  default-mysql-client \
+  git \
+  iproute2 \
+  msmtp-mta \
+  nano \
+  nodejs \
+  npm \
+  rsync \
+  sudo \
+  unzip \
+  vim \
+  zip \
+  vpnc \
+  wget \
+  memcached \
+  telnet \
+  openssh-client \
+  jq \
+  && rm -rf /var/lib/apt/lists/*
 
 # 3. Install PHP and PECL extensions (Using the magic script)
 # This replaces all 'docker-php-ext-install' and 'pecl install' blocks
 # The script handles missing dependencies (like libc-client)
 RUN install-php-extensions \
-    bcmath \
-    gd \
-    gettext \
-    imap \
-    intl \
-    mysqli \
-    opcache \
-    pdo_mysql \
-    soap \
-    zip \
-    filter \
-    imagick \
-    xdebug
+  bcmath \
+  gd \
+  gettext \
+  imap \
+  intl \
+  mysqli \
+  opcache \
+  pdo_mysql \
+  soap \
+  zip \
+  filter \
+  imagick \
+  xdebug
 
 # 4. Enable Apache modules
 RUN a2enmod rewrite headers
@@ -75,7 +75,7 @@ RUN echo 'export PATH="$HOME/.composer/vendor/drush/drush:$PATH"' >> /root/.bash
 WORKDIR /buildkit
 ENV PATH="/buildkit/bin:${PATH}"
 
-RUN git clone https://github.com/rubofvil/civicrm-buildkit.git . \
+RUN git clone https://github.com/civicrm/civicrm-buildkit.git . \
   && git clone https://github.com/squizlabs/PHP_CodeSniffer \
   && git clone https://github.com/civicrm/coder.git
 
