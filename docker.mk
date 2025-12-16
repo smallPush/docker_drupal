@@ -153,6 +153,8 @@ download_drupal_civicrm:
 	docker-compose down && docker-compose up -d
 #	docker exec $(shell docker ps --filter name='^/$(PROJECT_NAME)_civicrm' --format "{{ .ID }}") composer install --working-dir=$(COMPOSER_ROOT)
 
+
+
 .PHONE: sync_external_db
 sync_external_db:
 #Pending to set a bigger insert in the external SET GLOBAL bulk_insert_buffer_size = 1024 * 1024 * 256;
@@ -172,25 +174,41 @@ sync_external_db:
 	make set_permissions
 
 replace_local_db_with_external_db:
-	@RESPONSE_PARAMS_MYSQL=$$(ssh $(SSH_REMOTE_EXTRA_PARAMS) $(SSH_REMOTE_USER)@$(SSH_REMOTE_HOST) $(DRUSH_BASH_EXECUTION) sql-connect); \
-	echo "Original Connection String: $$RESPONSE_PARAMS_MYSQL"; \
-	MYSQL_REMOTE_USER=$$(echo "$$RESPONSE_PARAMS_MYSQL" | grep -Po '(?<=--user=)[^ ]+' || true); \
-	MYSQL_REMOTE_PASS=$$(echo "$$RESPONSE_PARAMS_MYSQL" | grep -Po '(?<=--password=)[^ ]+' || true); \
-	MYSQL_REMOTE_DB=$$(echo "$$RESPONSE_PARAMS_MYSQL" | grep -Po '(?<=--database=)[^ ]+' || true); \
-	MYSQL_REMOTE_HOST=$$(echo "$$RESPONSE_PARAMS_MYSQL" | grep -Po '(?<=--host=)[^ ]+' || true); \
-	MYSQL_REMOTE_PORT=$$(echo "$$RESPONSE_PARAMS_MYSQL" | grep -Po '(?<=--port=)[^ ]+' || true); \
-	echo "User:     $$MYSQL_REMOTE_USER"; \
-	echo "Password: $$MYSQL_REMOTE_PASS"; \
-	echo "Database: $$MYSQL_REMOTE_DB"; \
-	echo "Host:     $$MYSQL_REMOTE_HOST"; \
-	echo "Port:     $$MYSQL_REMOTE_PORT"; \
-	ssh $(SSH_REMOTE_EXTRA_PARAMS) $(SSH_REMOTE_USER)@$(SSH_REMOTE_HOST) "mysqldump --skip-triggers -u $$MYSQL_REMOTE_USER -p$$MYSQL_REMOTE_PASS -h $$MYSQL_REMOTE_HOST $$MYSQL_REMOTE_DB" | gzip > $$MYSQL_REMOTE_DB.sql.gz; \
-	gunzip -f $$MYSQL_REMOTE_DB.sql.gz; \
-	docker cp $$MYSQL_REMOTE_DB.sql $(shell docker ps --filter name='^/$(PROJECT_NAME)_mysql' --format "{{ .ID }}"):/$$MYSQL_REMOTE_DB.sql; \
+	@read -p "Do you have a database dump file to import directly? [y/N] " USE_EXISTING_DB; \
+	if [ "$$USE_EXISTING_DB" = "y" ] || [ "$$USE_EXISTING_DB" = "Y" ]; then \
+		read -p "Enter the filename: " DB_FILE; \
+		if [ ! -f "$$DB_FILE" ]; then \
+			echo "File $$DB_FILE not found!"; \
+			exit 1; \
+		fi; \
+	else \
+		RESPONSE_PARAMS_MYSQL=$$(ssh $(SSH_REMOTE_EXTRA_PARAMS) $(SSH_REMOTE_USER)@$(SSH_REMOTE_HOST) $(DRUSH_BASH_EXECUTION) sql-connect); \
+		echo "Original Connection String: $$RESPONSE_PARAMS_MYSQL"; \
+		MYSQL_REMOTE_USER=$$(echo "$$RESPONSE_PARAMS_MYSQL" | grep -Po '(?<=--user=)[^ ]+' || true); \
+		MYSQL_REMOTE_PASS=$$(echo "$$RESPONSE_PARAMS_MYSQL" | grep -Po '(?<=--password=)[^ ]+' || true); \
+		MYSQL_REMOTE_DB=$$(echo "$$RESPONSE_PARAMS_MYSQL" | grep -Po '(?<=--database=)[^ ]+' || true); \
+		MYSQL_REMOTE_HOST=$$(echo "$$RESPONSE_PARAMS_MYSQL" | grep -Po '(?<=--host=)[^ ]+' || true); \
+		MYSQL_REMOTE_PORT=$$(echo "$$RESPONSE_PARAMS_MYSQL" | grep -Po '(?<=--port=)[^ ]+' || true); \
+		echo "User:     $$MYSQL_REMOTE_USER"; \
+		echo "Password: $$MYSQL_REMOTE_PASS"; \
+		echo "Database: $$MYSQL_REMOTE_DB"; \
+		echo "Host:     $$MYSQL_REMOTE_HOST"; \
+		echo "Port:     $$MYSQL_REMOTE_PORT"; \
+		ssh $(SSH_REMOTE_EXTRA_PARAMS) $(SSH_REMOTE_USER)@$(SSH_REMOTE_HOST) "mysqldump --skip-triggers -u $$MYSQL_REMOTE_USER -p$$MYSQL_REMOTE_PASS -h $$MYSQL_REMOTE_HOST $$MYSQL_REMOTE_DB" | gzip > $$MYSQL_REMOTE_DB.sql.gz; \
+		gunzip -f $$MYSQL_REMOTE_DB.sql.gz; \
+		DB_FILE=$$MYSQL_REMOTE_DB.sql; \
+	fi; \
+	docker cp $$DB_FILE $(shell docker ps --filter name='^/$(PROJECT_NAME)_mysql' --format "{{ .ID }}"):/$$DB_FILE; \
 	docker exec $(shell docker ps --filter name='^/$(PROJECT_NAME)_mysql' --format "{{ .ID }}") mysql -u root -padmin -e "DROP DATABASE IF EXISTS drupal; CREATE DATABASE drupal;"; \
-	docker exec $(shell docker ps --filter name='^/$(PROJECT_NAME)_mysql' --format "{{ .ID }}") sh -c "mysql -u root -padmin drupal < /$$MYSQL_REMOTE_DB.sql"; \
-	docker exec $(shell docker ps --filter name='^/$(PROJECT_NAME)_mysql' --format "{{ .ID }}") rm /$$MYSQL_REMOTE_DB.sql; \
-	rm $$MYSQL_REMOTE_DB.sql
+	docker exec $(shell docker ps --filter name='^/$(PROJECT_NAME)_mysql' --format "{{ .ID }}") sh -c "mysql -u root -padmin drupal < /$$DB_FILE"; \
+	docker exec $(shell docker ps --filter name='^/$(PROJECT_NAME)_mysql' --format "{{ .ID }}") rm /$$DB_FILE; \
+	read -p "Do you want to delete the database dump file ($$DB_FILE)? [y/N] " DELETE_DB_FILE; \
+	if [ "$$DELETE_DB_FILE" = "y" ] || [ "$$DELETE_DB_FILE" = "Y" ]; then \
+		rm $$DB_FILE; \
+		echo "Database dump file removed."; \
+	else \
+		echo "Database dump file kept."; \
+	fi
 
 # Get the remote files from the remote server with scp, check if not exist the directory html and create
 get_remote_files:
